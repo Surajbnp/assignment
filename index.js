@@ -1,50 +1,26 @@
 const express = require("express");
 const GoogleStrategy = require("passport-google-oauth2").Strategy;
 require("dotenv").config();
+require('./config/googleAuth')
 const passport = require("passport");
 const connection = require("./config/db");
+const isLoggedIn = require("./middlewares/authenticator");
+const session = require("express-session");
 
 const app = express();
+app.use(session({ secret: "cats" }));
+app.use(passport.initialize());
+app.use(passport.session());
 const PORT = process.env.PORT || 8080;
 
-app.use(passport.initialize());
-// app.use(passport.session());
-
 app.get("/", (req, res) => {
-  res.send("Homepage");
+  res.send(`<a href='/auth/google'>Login with Google</a>`);
 });
 
-app.get("/create", (req, res) => {
-  res.send("create an event now");
+app.get("/create", isLoggedIn, (req, res) => {
+    console.log(req.user)
+  res.send(`<h3> Hello ${req.user.name}</h3> <img src=${req.user.picture} /> <a href='/logout'>Logout</a> `);
 });
-
-passport.serializeUser(function (user, cb) {
-  cb(null, user);
-});
-
-passport.deserializeUser(function (obj, cb) {
-  cb(null, obj);
-});
-
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "http://localhost:8080/auth/google/callback",
-      passReqToCallback: true,
-    },
-    function (request, accessToken, refreshToken, profile, done) {
-      // User.findOrCreate({ googleId: profile.id }, function (err, user) {
-      // });
-      const user = {
-        email: profile.email,
-        name: profile.displayName,
-      };
-      done(null, user);
-    }
-  )
-);
 
 app.get(
   "/auth/google",
@@ -54,13 +30,9 @@ app.get(
 app.get(
   "/auth/google/callback",
   passport.authenticate("google", {
+    successRedirect: "/create",
     failureRedirect: "/auth/failure",
-    session: false,
-  }),
-  (req, res, next) => {
-    console.log(req.user, req.isAuthenticated());
-    res.redirect("/create");
-  }
+  })
 );
 
 app.get("/auth/failure", (req, res, next) => {
@@ -69,7 +41,7 @@ app.get("/auth/failure", (req, res, next) => {
 
 app.get("/logout", (req, res) => {
   req.logout;
-  console.log(req.isAuthenticated());
+  req.session.destroy();
   res.redirect("/");
 });
 
